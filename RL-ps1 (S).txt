@@ -1,0 +1,143 @@
+import random
+import math
+import copy
+import statistics
+import numpy as np
+from matplotlib import pyplot as plt
+
+class MAB:
+  def __init__(self, n):
+    self.n = n
+    self.trial = 0
+    self.mean = [random.randint(1,15) for x in range(n)]
+    self.std =   [0.1*random.randint(1,3) for x in range(n)]
+    self.history = []
+    self.N_t = {i:0 for i in range(self.n)}
+
+
+  def reward(self,arm):
+    reward =  random.gauss(self.mean[arm],self.std[arm])
+    # reward = self.mean[arm]
+    self.history.append((arm,reward))
+    self.trial +=1
+    self.N_t[arm] +=1
+    return reward
+
+def simulate (mab, trials, strategy=None, **kwargs):
+  rewards = []
+  for _ in range(trials):
+    if strategy is not None:
+      arm = strategy(mab,**kwargs)
+    else:
+      arm = random.randint(0,mab.n-1)    
+    rewards.append(mab.reward(arm))
+  return rewards
+
+def greedy_next(mab):
+  Q_cap = {i:0 for i in range(mab.n)}
+  for arm,reward in(mab.history):
+    Q_cap[arm] = Q_cap[arm] + (reward - Q_cap[arm])/mab.n
+  return max(Q_cap,key=Q_cap.get)
+
+def epsilon_greedy_next(mab, epsilon=.4):
+  Q_cap = {i:0 for i in range(mab.n)}
+  for arm,reward in(mab.history):
+    Q_cap[arm] = Q_cap[arm] + (reward - Q_cap[arm])/mab.n
+  greedy_choice = max(Q_cap,key=Q_cap.get)
+  random_choice = random.randint(0,mab.n-1)
+  p = random.random()
+  if p<epsilon:
+    return random_choice
+  else:
+    return greedy_choice
+
+def ucb_next(mab, c=0.4):
+  Q_cap = {i:0 for i in range(mab.n)}
+  for arm,reward in(mab.history):
+    Q_cap[arm] = Q_cap[arm] + (reward - Q_cap[arm])/mab.n
+  ucb_score = {arm:Q_cap[arm] + c * math.sqrt(math.log(mab.trial)/(mab.N_t[arm]+0.00001)) for arm in range(mab.n)}
+  return max(ucb_score,key=ucb_score.get)
+
+def incremental_uniform(mab, loops=1):
+  # equalize arm pulls
+  max_times = max(mab.N_t.values())
+  for arm in range(mab.n):
+    while mab.N_t[arm]<max_times:
+      mab.reward(arm)
+  #loop 
+  for loop in range(loops):
+    for arm in range(mab.n):
+      mab.reward(arm)
+  return greedy_next(mab)
+
+mab = MAB(5)
+
+simulate(mab,100)
+mab_random = copy.deepcopy(mab)
+mab_greedy = copy.deepcopy(mab)
+mab_eps_greedy = copy.deepcopy(mab)
+mab_ucb = copy.deepcopy(mab)
+mab_inc_uni =  copy.deepcopy(mab)
+
+random_ = simulate(mab_random,1500)
+greedy = simulate(mab_greedy,1500,greedy_next)
+eps_greedy = simulate(mab_eps_greedy,1500,epsilon_greedy_next)
+ucb = simulate(mab_ucb,1500,ucb_next)
+inc_uni = simulate(mab_inc_uni,200,incremental_uniform)
+
+rewards_history = lambda mab : [0]+[y for x,y in mab.history]
+
+plt.plot(rewards_history(mab_random))
+plt.plot(rewards_history(mab_greedy))
+# plt.plot(rewards_history(mab_eps_greedy))
+# plt.plot(rewards_history(mab_ucb))
+#plt.plot(rewards_history(mab_inc_uni))
+plt.legend(['Random','Greedy','E-Greedy','UCB','Incremental Uniform'])
+plt.rcParams['figure.figsize'] = [20,10]
+
+plt.plot(rewards_history(mab_greedy))
+plt.plot(rewards_history(mab_eps_greedy))
+plt.legend(['Greedy','E-Greedy','UCB','Incremental Uniform'])
+
+plt.plot(rewards_history(mab_greedy))
+plt.plot(rewards_history(mab_ucb))
+plt.legend(['Greedy','UCB'])
+
+def PAC_next(mab,eps=0.1,delta=0.1):
+    n = int(math.ceil(4/(eps**2) * math.log(2*mab.n/delta)))
+    Q_cap = {i:0 for i in range(mab.n)}
+    for arm in range(mab.n):
+      for i in range(n):
+        Q_cap[arm] = Q_cap[arm] + (mab.reward(arm) - Q_cap[arm])/(i+1)
+    return max(Q_cap,key=Q_cap.get)
+
+mab = MAB(1000)
+
+PAC_next(mab,eps = 0.1,delta=0.1)
+
+mab.mean
+
+mab.std
+
+def median_elimination_next(mab, eps, delta):
+  arms = np.ones(mab.n,dtype="bool")
+  eps_l,delta_l = eps/4,delta/2
+  Q_cap = {i:0 for i in range(mab.n)}
+
+  while arms.sum()>1:
+    n = int(math.ceil(1/(eps/2)**2 * math.log(3/delta)))
+    for arm in range(mab.n):
+      if(arms[arm]):
+        for i in range(n):
+          Q_cap[arm] = Q_cap[arm] + (mab.reward(arm) - Q_cap[arm])/(i+1)
+    eps = 3*eps/4
+    delta = delta/2
+    median = np.median([Q_cap[arm] for arm in arms])
+    for arm in arms:
+      if Q_cap[arm] <= median:
+        arms.remove(arm)
+  return arms[0]
+
+median_elimination_next(mab,eps=0.1,delta=0.1)
+
+np.ones(9,dtype="bool").sum()

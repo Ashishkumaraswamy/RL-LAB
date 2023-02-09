@@ -1,0 +1,57 @@
+import numpy as np
+
+class PAC:
+  def __init__(self,reward_func,eps = 0.1, delta = 0.1):
+    self.n_arms = len(reward_func)
+    self.eps = eps
+    self.delta = delta
+    self.arm_avg = np.zeros(self.n_arms)
+    self.reward_func = reward_func
+    self.total_trials = 0
+
+  def best_arm(self):
+    return np.argmax(self.arm_avg)
+
+  def get_total_trial(self):
+    return self.total_trials
+
+class Naive(PAC):
+  def __init__(self,reward_func,eps = 0.1, delta = 0.1):
+    super().__init__(reward_func,eps,delta)
+
+  def update(self):
+    n = int(np.ceil(4/(self.eps**2) * np.log(2*self.n_arms/self.delta)))
+    self.total_trials = n * self.n_arms
+    for i in range(self.n_arms):
+      self.arm_avg[i] = np.mean(self.reward_func[i](n))
+
+class Median_elim(PAC):
+  def __init__(self,reward_func,eps = 0.1, delta = 0.1):
+    super().__init__(reward_func,eps,delta)
+    self.available = np.ones(self.n_arms)
+
+  def update(self):
+    eps,delta = self.eps,self.delta
+    eps,delta = eps/4,delta/2
+    while np.sum(self.available) != 1:
+      n = int(np.ceil(1/(eps/2)**2 * np.log(3/delta)))
+      for i in range(self.n_arms):
+        if self.available[i] == 1:
+          self.total_trials += n
+          self.arm_avg[i] = np.mean(self.reward_func[i](n))
+      eps = 3*eps/4
+      delta = delta/2
+      median = np.median(self.arm_avg[self.available.astype(bool)])
+      self.available[self.arm_avg< median] = 0
+
+functions = [(lambda y: (lambda x : np.random.randn(x)+y))(i) for i in range(1000)]
+
+obj1 = Naive(functions)
+obj1.update()
+obj1.best_arm()
+obj1.get_total_trial()
+
+obj2 = Median_elim(functions)
+obj2.update()
+obj2.best_arm()
+obj2.get_total_trial()

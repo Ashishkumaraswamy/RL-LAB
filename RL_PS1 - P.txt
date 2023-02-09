@@ -1,0 +1,170 @@
+import numpy as np
+import random
+import matplotlib.pyplot as plt
+
+arms = [0,1,2,3,4]
+rewards = [1,2,3]
+probs = {
+    0 : [0.3,0.3,0.4],
+    1 : [0.1,0.1,0.8],
+    2 : [0.2,0.5,0.3],
+    3 : [0.4,0.4,0.2],
+    4 : [0.6,0.3,0.1]
+}
+
+# Greedy
+
+class Greedy:
+  def __init__(self, n_arms):
+    self.n_arms = n_arms
+    self.initialize(n_arms)
+  
+  def initialize(self, n_arms):
+    self.counts = [0 for _ in range(n_arms)]
+    self.values = [0.0 for _ in range(n_arms)]
+  
+  def selectArm(self):
+    return np.argmax(self.values)
+  
+  def showExpectedVals(self):
+    for i in range(self.n_arms):
+      print("Arm a_" + str(i),"->",self.values[i]);
+  
+  def update(self, chosen_arm, reward):
+    self.counts[chosen_arm] += 1
+    n = self.counts[chosen_arm]
+    value = self.values[chosen_arm]
+    new_value = ((n - 1) / float(n)) * value + (1 / float(n)) * reward
+    self.values[chosen_arm] = new_value
+
+greedy5B = Greedy(len(arms))
+
+for i in range(20):
+  armChoice = random.choice(arms);
+  rewardChoice = random.choices(rewards, weights = probs[armChoice])[0]
+  
+  greedy5B.update(armChoice,rewardChoice)
+  
+  print("Trial", i+1, ": arm " + str(armChoice),"->",rewardChoice);
+
+greedy5B.showExpectedVals()
+
+greedy5B.selectArm()
+
+# Epsilon Greedy
+
+class EpsGreedy:
+  def __init__(self, n_arms, eps):
+    self.n_arms = n_arms
+    self.epsilon = eps
+    self.initialize(n_arms)
+  
+  def initialize(self, n_arms):
+    self.counts = [0 for _ in range(n_arms)]
+    self.values = [0.0 for _ in range(n_arms)]
+  
+  def selectArm(self):
+    if np.random.random() > self.epsilon:
+      return np.argmax(self.values)
+    else:
+      return np.random.randint(len(self.values))
+  
+  def showExpectedVals(self):
+    for i in range(self.n_arms):
+      print("Arm a_" + str(i),"->",self.values[i]);
+  
+  def update(self, chosen_arm, reward):
+    self.counts[chosen_arm] += 1
+    n = self.counts[chosen_arm]
+    value = self.values[chosen_arm]
+    new_value = ((n - 1) / float(n)) * value + (1 / float(n)) * reward
+    self.values[chosen_arm] = new_value
+
+def findAvgRewList(epsGreedy):
+  AvgRew = [0]
+  Avg = 0
+  for i in range(2500):
+    curArm = epsGreedy.selectArm()
+    curRew = random.choices(rewards, weights = probs[curArm])[0]
+
+    epsGreedy.update(curArm,curRew)
+    Avg = ((i)*Avg + curRew)/(i+1)
+    AvgRew.append(Avg)
+  return AvgRew
+
+def plotEpsPlots(epsList):
+  epsGreedies = []
+
+  for i in epsList:
+    epsGreedies.append(EpsGreedy(len(arms),i))
+
+  plt.figure(figsize=(20, 5))
+  
+  for x in epsGreedies:
+    plt.plot(findAvgRewList(x))
+  
+  plt.legend(epsList)
+  plt.show()
+
+plotEpsPlots([0,0.01,0.1,0.5,0.001,0.75])
+
+# UCB
+
+class UCB:
+  def __init__(self, n_arms, c):
+    self.n_arms = n_arms
+    self.c = c
+    self.its = 0
+    self.initialize(n_arms)
+  
+  def initialize(self, n_arms):
+    self.counts = [0 for _ in range(n_arms)]
+    self.values = [0.0 for _ in range(n_arms)]
+    for i in range(n_arms):
+      self.update(i,random.choices(rewards, weights = probs[i])[0])
+  
+  def selectArm(self):
+    return np.argmax(self.values + self.c * np.array((np.log(self.its)/self.counts)**0.5))
+
+  def showExpectedVals(self):
+    for i in range(self.n_arms):
+      print("Arm a_" + str(i),"->",self.values[i]);
+  
+  def update(self, chosen_arm, reward):
+    self.its += 1
+    self.counts[chosen_arm] += 1
+    n = self.counts[chosen_arm]
+    value = self.values[chosen_arm]
+    new_value = ((n - 1) / float(n)) * value + (1 / float(n)) * reward
+    self.values[chosen_arm] = new_value
+
+def findAvgRewList(method):
+  AvgRew = [0]
+  Avg = 0
+  for i in range(2500):
+    curArm = method.selectArm()
+    curRew = random.choices(rewards, weights = probs[curArm])[0]
+
+    method.update(curArm,curRew)
+    Avg = ((i)*Avg + curRew)/(i+1)
+    AvgRew.append(Avg)
+  return AvgRew
+
+ucb1 = UCB(len(arms), 1)
+
+def plotUCBPlots(cList):
+  UCBGreedies = []
+
+  for i in cList:
+    UCBGreedies.append(EpsGreedy(len(arms),i))
+
+  plt.figure(figsize=(20, 5))
+  
+  for x in UCBGreedies:
+    plt.plot(findAvgRewList(x))
+  
+  plt.legend(cList)
+  plt.show()
+
+plotUCBPlots([0,0.5,1,1.5,2])
+

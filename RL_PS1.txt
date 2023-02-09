@@ -1,0 +1,124 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+#GREEDY APPROACH
+
+class Greedy:
+  def __init__(self,n_arm):
+    self.n_arm = n_arm
+    self.arm_avg = np.zeros(n_arm)
+    self.arm_pick = np.ones(n_arm)
+    self.its = 0
+
+  def initialise(self):
+    self.arm_avg = np.random.randint(0,10,(self.n_arm,)).astype(float)
+
+  def update(self,its):
+    self.its += its
+    for i in range(its):
+      great_arm = np.argmax(self.arm_avg)
+      reward = np.random.randint(0,10,(1,))[0]
+      self.arm_avg[great_arm] = ( self.arm_avg[great_arm] * self.arm_pick[great_arm] + reward ) / (self.arm_pick[great_arm] + 1.0)
+      self.arm_pick[great_arm] += 1
+
+  def best_arm(self):
+    return np.argmax(self.arm_avg) + 1 
+
+  def get_arm_avg(self):
+    return self.arm_avg
+
+obj = Greedy(5)
+obj.initialise()
+obj.update(100)
+print(obj.best_arm())
+
+#Epsilon Greedy
+
+class e_Greedy:
+  def __init__(self,n_arm,reward_func,eps=0.1):
+    self.n_arm = n_arm
+    self.arm_avg = np.zeros(n_arm)
+    self.arm_pick = np.zeros(n_arm)
+    self.eps = eps
+    self.its = 0
+    self.reward_func = reward_func
+    self.rews = []
+  
+  def update(self,its):
+    self.its += its
+    for i in range(its):
+      rand_eps = np.random.uniform(0,1,1)[0]
+      
+      if rand_eps < self.eps:
+        arm = np.random.choice(self.n_arm,1)[0]
+      else:
+        arm = self.best_arm() - 1
+      reward = self.reward_func[arm]()#np.random.randint(0,10,(1,))[0]
+      self.arm_avg[arm] = ( self.arm_avg[arm] * self.arm_pick[arm] + reward ) / (self.arm_pick[arm] + 1.0)
+      self.arm_pick[arm] += 1  
+      self.rews.append(reward)
+
+  def best_arm(self):
+    return np.argmax(self.arm_avg) + 1 
+
+  def plotter(self):
+    rews = np.cumsum(self.rews).astype(float)
+    for i in range(len(rews)):
+      rews[i] = rews[i]/(i+1.0)
+    plt.plot(range(1,len(rews)+1),rews)
+
+  def get_arm_avg(self):
+    return self.arm_avg
+
+functions = [
+    lambda : np.random.randn,
+    lambda : np.random.randn()+2,
+    lambda : np.random.randn()+3,
+    lambda : np.random.randn()+4,
+    lambda : np.random.randn()+5,
+    lambda : np.random.randint(0,10)
+]
+
+
+obj = e_Greedy(6,functions,0.1)
+obj.update(1000)
+obj.plotter()
+
+#UCB
+
+class UCB:
+  def __init__(self,n_arm,reward_func,c=1):
+    self.n_arm = n_arm
+    self.arm_avg = np.zeros(n_arm)
+    self.arm_pick = np.ones(n_arm)
+    self.c = c
+    self.its = 0
+    self.reward_func = reward_func
+    self.rews = []
+
+  def initialise(self):
+    self.arm_avg = np.array([i() for i in self.reward_func])
+
+  def best_arm(self):
+    return np.argmax(self.arm_avg + self.c * (np.array([np.log(self.its)])/self.arm_pick)**0.5)
+
+  def update(self,its):
+    self.its += its
+    for i in range(its):
+      arm = self.best_arm()
+      reward = self.reward_func[arm]()#np.random.randint(0,10,(1,))[0]
+      self.arm_avg[arm] = ( self.arm_avg[arm] * self.arm_pick[arm] + reward ) / (self.arm_pick[arm] + 1.0)
+      self.arm_pick[arm] += 1  
+      self.rews.append(reward)
+
+  def plotter(self):
+    rews = np.cumsum(self.rews).astype(float)
+    for i in range(len(rews)):
+      rews[i] = rews[i]/(i+1.0)
+    plt.plot(range(1,len(rews)+1),rews)
+
+
+obj = UCB(6,functions,2.5)
+obj.initialise()
+obj.update(1000)
+obj.plotter()
